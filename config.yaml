@@ -1,0 +1,28 @@
+# Configuration file for RAG Chatbot
+
+# Embedding Model
+embedding_model: "sentence-transformers/all-MiniLM-L6-v2"
+
+# Vector Database
+index_path: "models/vector_index.pkl"
+
+# RAG Settings
+retrieval:
+  top_k: 5
+  use_advanced: true  # Set to false for Basic RAG
+
+# Guardrails
+guardrails:
+  confidence_threshold: 0.3
+  blocked_keywords:
+    - "hack"
+    - "attack"
+    - "malware"
+    - "fraud"
+    - "phishing"
+    - "scam"
+    - "exploit"
+
+# UI Settings
+ui:
+  title: "📊 Financial RAG Chatbot"
