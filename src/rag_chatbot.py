@@ -4,7 +4,7 @@ import yaml
 import io
 from contextlib import redirect_stdout
 import re
-
+from transformers import pipeline
 
 class RAGChatbot:
     def __init__(self, model_name=None):
@@ -37,38 +37,52 @@ class RAGChatbot:
 
     def get_response(self, context, query):
         """
-        Generate a response using the dynamically selected model.
+        Generate a response using structured financial data.
         """
         input_text = (
-            f"Use ONLY the following information to answer:\n{context}\n"
-            f"If the answer is not found, respond with 'I don't know'.\n"
-            f"Question: {query}\nAnswer:\n"
+            f"Use ONLY the structured financial data below to answer the question.\n\n"
+            f"DATASET:\n{context}\n\n"
+            f"Follow these rules:\n"
+            f"- If a specific year is mentioned, return data ONLY for that year.\n"
+            f"- If a numerical threshold is mentioned, apply it to the relevant column.\n"
+            f"- If the requested data is unavailable, respond with 'I don't know'.\n\n"
+            f"Question: {query}\nAnswer:"
         )
 
         inputs = self.tokenizer(input_text, return_tensors="pt", truncation=True, max_length=512).to(self.device)
 
         with torch.no_grad():
-            output_ids = self.model.generate(
-                **inputs,
-                max_new_tokens=200,
-                temperature=0.7,
-                top_p=0.9,
-                repetition_penalty=1.1,
-                return_dict_in_generate=True,  # Ensure structured return
-                output_scores=True  # Track generated tokens
-            )
+            output = self.model.generate(**inputs, max_new_tokens=200, temperature=0.7, top_p=0.9,
+                                         repetition_penalty=1.1)
 
-        # Decode the model's output to text
-        response_text = self.tokenizer.decode(output_ids["sequences"][0], skip_special_tokens=True)
+        return self.tokenizer.decode(output[0], skip_special_tokens=True)
 
-        print(f"📝 Raw Model Response: {response_text}")  # Debug log
-
-        # Extract only the answer portion
-        if "Answer:" in response_text:
-            cleaned_response = response_text.split("Answer:")[-1].strip()
-        else:
-            cleaned_response = response_text  # Fallback
-
-        print(f"✅ Final Cleaned Response: {cleaned_response}")  # Debug log
-
-        return cleaned_response  # Return only the cleaned answer
+    # def get_response(self, context, query):
+    #     """
+    #     Generate a response using the dynamically selected model.
+    #     """
+    #     input_text = (
+    #         f"Use ONLY the following information to answer:\n{context}\n"
+    #         f"If the answer is not found, respond with 'I don't know'.\n"
+    #         f"Question: {query}\nAnswer:\n"
+    #     )
+    #
+    #     # Use Hugging Face pipeline for better response extraction
+    #     generator = pipeline("text-generation", model=self.model, tokenizer=self.tokenizer,
+    #                          device=0)  # Use GPU if available
+    #
+    #     print("🚀 Generating response...")
+    #     response_text = generator(input_text, max_new_tokens=200, do_sample=True, temperature=0.7, top_p=0.9)[0][
+    #         "generated_text"]
+    #
+    #     print(f"📝 Raw Model Response: {response_text}")  # Debug log
+    #
+    #     # Extract only the answer portion
+    #     if "Answer:" in response_text:
+    #         cleaned_response = response_text.split("Answer:")[-1].strip()
+    #     else:
+    #         cleaned_response = response_text  # Fallback
+    #
+    #     print(f"✅ Final Cleaned Response: {cleaned_response}")  # Debug log
+    #
+    #     return cleaned_response  # Return only the cleaned answer

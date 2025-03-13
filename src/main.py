@@ -1,7 +1,8 @@
-import time
-
 import streamlit as st
 import yaml
+import os
+import pickle
+import time
 
 from src.data_processor import FinancialDataProcessor
 from src.embedding_model import EmbeddingModel
@@ -9,10 +10,6 @@ from src.vector_store import FAISSVectorStore
 from src.chunk_merger import ChunkMerger
 from src.rag_chatbot import RAGChatbot
 from src.guardrails import Guardrails
-import os
-import pickle
-import os
-os.environ["STREAMLIT_SERVER_RUN_ON_SAVE"] = "false"
 
 @st.cache_resource
 def load_chatbot(model_choice):
@@ -29,12 +26,18 @@ config = load_config()
 st.sidebar.title("⚙️ Model Selection")
 model_choice = st.sidebar.selectbox("Choose a model:", list(config["slm_models"].keys()), index=list(config["slm_models"].keys()).index(config["default_model"]))
 
+# Streamlit UI for selecting RAG mode
+rag_mode = st.sidebar.radio("Choose Retrieval Mode:", ["Basic RAG", "Advanced RAG"])
+
 # Initialize Components
 processor = FinancialDataProcessor(config["data_path"])
 chunks = processor.preprocess_data()
 embedding_model = EmbeddingModel(config["embedding_model"])
-embedding_cache_path = "data/embeddings.pkl"
-
+embedding_cache_path = config["embedding_cache_path"]
+# Add dataset preview option
+if st.sidebar.button("Preview Dataset"):
+    st.write("### Financial Dataset Preview")
+    st.dataframe(processor.data.head(10))
 if os.path.exists(embedding_cache_path):
     print("✅ Loading cached embeddings...")
     with open(embedding_cache_path, "rb") as f:
@@ -45,53 +48,78 @@ else:
     with open(embedding_cache_path, "wb") as f:
         pickle.dump(chunk_embeddings, f)
 
-
 vector_store = FAISSVectorStore(chunk_embeddings.shape[1])
 vector_store.add_embeddings(chunk_embeddings)
-vector_store.save_index("faiss_index.bin")
-vector_store.load_index("faiss_index.bin")
-
+vector_store.save_index(config["index_path"])
+vector_store.load_index(config["index_path"])
 
 # Initialize Retrieval, Chatbot & Guardrails
-chunk_merger = ChunkMerger(chunks, embedding_model, vector_store)
+chunk_merger = ChunkMerger(chunks, processor.data,embedding_model, vector_store)
 chatbot = load_chatbot(model_choice)
 guardrails = Guardrails()
 
+# Initialize session state for chat history
+if "chat_history" not in st.session_state:
+    st.session_state.chat_history = []
 
-# Streamlit UI Implementation
-st.title("Financial RAG Chatbot")
+# Layout with two columns and a vertical divider
+col1, col2 = st.columns([2, 1])  # Middle column for spacing
 
-# Add dataset preview option
-if st.sidebar.button("Preview Dataset"):
-    st.write("### Financial Dataset Preview")
-    st.dataframe(processor.data.head(10))
+with col1:
+    st.markdown("<h2 style='text-align: center;'>💬 Financial RAG Chatbot</h2>", unsafe_allow_html=True)
+    query = st.text_input("Enter your financial question:")
+    if st.button("Get Answer"):
+        start_time = time.time()  # Track response time
+        response = "⚠️ No relevant information found in the dataset."
+        if guardrails.validate_input(query):
+            retrieved_chunks = chunk_merger.retrieve_chunks(query, top_k=config["retrieval"]["top_k"])
+            print(f"🔍 FAISS Retrieved Chunks (Count: {len(retrieved_chunks)}):", retrieved_chunks)
 
-query = st.text_input("Enter your financial question:")
-if st.button("Get Answer"):
-    start_time = time.time()  # Track response time
-    if guardrails.validate_input(query):
-        retrieved_chunks = chunk_merger.retrieve_chunks(query, top_k=3)
-
-        print(f"🔍 FAISS Retrieved Chunks (Count: {len(retrieved_chunks)}):", retrieved_chunks)  # Debug log
-        if not retrieved_chunks:
-            print("❌ No relevant chunks retrieved. FAISS might not be returning correct results.")
-
-        if not retrieved_chunks:
-            st.write("⚠️ No relevant information found in the dataset.")
-        else:
-            merged_text = "\n".join(retrieved_chunks)  # Merge retrieved chunks
-            response = chatbot.get_response(merged_text, query)
-            # response = guardrails.filter_output(response)  # Ensure output filtering
-            if response:
-                st.write("### Response:")
-                formatted_response = response.replace("\n", "  \n")  # Ensure newlines are preserved in Markdown
-                st.markdown(f"```\n{formatted_response}\n```")  # Wrap in code block to preserve formatting
+            if rag_mode == "Basic RAG":
+                merged_text = "\n".join(retrieved_chunks)  # Simple merging
             else:
-                st.warning("⚠️ No response generated.")
+                merged_text = chunk_merger.adaptive_merge_chunks(query, retrieved_chunks)  # Advanced merging
+            if not retrieved_chunks:
+                st.write(response)
+            else:
+                response = chatbot.get_response(merged_text, query)
+                response = guardrails.filter_output(response)  # Ensure output filtering
+                if response:
+                    st.write("### Response:")
+                    formatted_response = response.replace("\n", "  \n")  # Ensure newlines are preserved in Markdown
+                    st.markdown(f"```\n{formatted_response}\n```")  # Wrap in code block to preserve formatting
+                else:
+                    st.warning("⚠️ No response generated.")
+        end_time = time.time()
+        response_time = round(end_time - start_time, 2)
+        st.sidebar.write(f"⏳ Response Time: {response_time} seconds")
+        # Store query, response, and RAG mode in session state chat history
+        st.session_state.chat_history.append((query, response, rag_mode))
 
-    else:
-        st.write("Invalid query. Please enter a financial-related question.")
+st.divider()
 
-    end_time = time.time()
-    response_time = round(end_time - start_time, 2)
-    st.sidebar.write(f"⏳ Response Time: {response_time} seconds")
+# Scrollable chat history
+with col2:
+    st.markdown("""
+        <style>
+        .chat-history {
+            max-height: 400px;
+            overflow-y: auto;
+            padding-right: 10px;
+        }
+        </style>
+        <div class="chat-history">
+    """, unsafe_allow_html=True)
+
+    st.markdown("<h2 style='text-align: center;'>📜 Chat History</h2>", unsafe_allow_html=True)
+
+    for q, r, mode in reversed(st.session_state.chat_history):
+        rag_color = "#ff5733" if mode == "Basic RAG" else "#33b5e5"  # Different color for each mode
+        st.markdown(f"<p style='color:{rag_color}; font-weight: bold;'>{mode}</p>", unsafe_allow_html=True)
+        st.write(f"**Q:** {q}")
+        st.write(f"**A:** {r}")
+        st.write("---")
+
+st.markdown("</div>", unsafe_allow_html=True)
+
+
