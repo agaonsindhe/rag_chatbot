@@ -1,0 +1,11 @@
+faiss-cpu
+numpy
+pandas
+sentence-transformers
+streamlit
+torch
+gpt4all
+langchain
+langchain-community
+transformers
+

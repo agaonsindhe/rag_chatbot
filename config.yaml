@@ -26,3 +26,14 @@ guardrails:
 # UI Settings
 ui:
   title: "📊 Financial RAG Chatbot"
+
+data_path: "data/BPF1_17032024142500687.csv"
+#slm_model: "TinyLlama/TinyLlama-1.1B-Chat-v1.0"
+slm_model: "google/gemma-2b"
+
+slm_models:
+#  mistral: "mistralai/Mistral-7B-Instruct-v0.1"
+  gemma: "google/gemma-2b"
+  tinyllama: "TinyLlama/TinyLlama-1.1B-Chat-v1.0"
+
+default_model: "tinyllama"  # Set the default model
