@@ -3,16 +3,19 @@ import time
 import streamlit as st
 import yaml
 
-from src.data_processor import FinancialDataProcessor
-from src.embedding_model import EmbeddingModel
-from src.vector_store import FAISSVectorStore
-from src.chunk_merger import ChunkMerger
-from src.rag_chatbot import RAGChatbot
-from src.guardrails import Guardrails
+from data_processor import FinancialDataProcessor
+from embedding_model import EmbeddingModel
+from vector_store import FAISSVectorStore
+from chunk_merger import ChunkMerger
+from rag_chatbot import RAGChatbot
+from guardrails import Guardrails
 import os
 import pickle
-import os
 os.environ["STREAMLIT_SERVER_RUN_ON_SAVE"] = "false"
+import sys
+
+print("Current Working Directory:", os.getcwd())
+print("Python Path:", sys.path)
 
 @st.cache_resource
 def load_chatbot(model_choice):
