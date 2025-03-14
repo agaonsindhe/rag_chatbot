@@ -17,11 +17,27 @@ class RAGChatbot:
         with open("config.yaml", "r") as file:
             config = yaml.safe_load(file)
 
+        # Load models from config
         self.models = config["slm_models"]
+        print("Available Models:", self.models)
 
-        # If no model is provided, use the default one
-        self.selected_model = model_name if model_name else config["default_model"]
-        model_path = self.models[self.selected_model]
+        # Fetch the actual Hugging Face model name
+        if model_name:
+            print("if model_name",model_name)
+            self.selected_model = model_name
+        else:
+            print("else default",config["slm_model"])
+            self.selected_model = config["slm_model"]
+
+        # Additional debug print
+        print(f"Selected Model: {self.selected_model}")
+
+        # Explicitly raise an error if the lookup failed
+        if not self.selected_model:
+            raise ValueError(f"Error: Failed to resolve the model name for key '{config["slm_model"]}'")
+
+        model_path = config["model_path"]
+        print(self.selected_model,model_path)
 
         ensure_huggingface_model(self.selected_model, model_path)
 

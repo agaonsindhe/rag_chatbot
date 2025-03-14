@@ -30,7 +30,24 @@ config = load_config()
 
 # Streamlit UI for model selection
 st.sidebar.title("⚙️ Model Selection")
-model_choice = st.sidebar.selectbox("Choose a model:", list(config["slm_models"].keys()), index=list(config["slm_models"].keys()).index(config["default_model"]))
+# Get list of model keys
+model_keys = list(config["slm_models"].keys())
+
+# Ensure default model key exists
+default_model_key = config["default_model"]
+if default_model_key not in model_keys:
+    raise ValueError(f"Error: Default model '{default_model_key}' not found in slm_models!")
+
+# Select a model using keys
+selected_model_key = st.sidebar.selectbox(
+    "Choose a model:",
+    model_keys,
+    index=model_keys.index(default_model_key)
+)
+
+# Resolve selected model name
+model_choice = config["slm_models"][selected_model_key]  # Convert key to full model path
+print("Model choice")
 
 # Initialize Components
 processor = FinancialDataProcessor(config["data_path"])
