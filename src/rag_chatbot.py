@@ -5,6 +5,8 @@ import io
 from contextlib import redirect_stdout
 import re
 
+from download_model import ensure_huggingface_model
+
 
 class RAGChatbot:
     def __init__(self, model_name=None):
@@ -20,6 +22,8 @@ class RAGChatbot:
         # If no model is provided, use the default one
         self.selected_model = model_name if model_name else config["default_model"]
         model_path = self.models[self.selected_model]
+
+        ensure_huggingface_model(self.selected_model, model_path)
 
         print(f"Loading model: {self.selected_model} ({model_path})...")
 
