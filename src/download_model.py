@@ -9,9 +9,12 @@ def ensure_huggingface_model(model_name, model_path):
     Ensures the Hugging Face model and tokenizer exist.
     If not found, downloads and saves them to the specified directory.
     """
-    if not os.path.exists(model_path):
+    print("saving model to ",model_path)
+    print("model name ",model_name)
+    save_model_path = model_path+model_name
+    if not os.path.exists(save_model_path):
         print(f"Downloading Hugging Face model: {model_name}...")
-        os.makedirs(model_path, exist_ok=True)
+        os.makedirs(save_model_path, exist_ok=True)
 
         # Download model & tokenizer
         model = AutoModelForCausalLM.from_pretrained(
@@ -21,10 +24,10 @@ def ensure_huggingface_model(model_name, model_path):
         )
 
         tokenizer = AutoTokenizer.from_pretrained(model_name)
-
+      
         # Save locally
-        model.save_pretrained(model_path)
-        tokenizer.save_pretrained(model_path)
+        model.save_pretrained(save_model_path)
+        tokenizer.save_pretrained(save_model_path)
 
         print(" Model download complete!")
     else:

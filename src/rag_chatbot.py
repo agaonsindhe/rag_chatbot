@@ -44,11 +44,13 @@ class RAGChatbot:
         print(f"Loading model: {self.selected_model} ({model_path})...")
 
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
-        self.tokenizer = AutoTokenizer.from_pretrained(model_path)
+        model_name = model_path + self.selected_model
+        print("loding model from ",model_name)
+        self.tokenizer = AutoTokenizer.from_pretrained(model_name)
 
         # Load model with optimized settings
         self.model = AutoModelForCausalLM.from_pretrained(
-            model_path,
+            model_name,
             torch_dtype=torch.float16 if self.device == "cuda" else torch.float32,
             low_cpu_mem_usage=True  # Optimized memory usage
         ).to(self.device)
