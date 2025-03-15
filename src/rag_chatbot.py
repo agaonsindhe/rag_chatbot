@@ -54,8 +54,22 @@ class RAGChatbot:
         with torch.no_grad():
             output = self.model.generate(**inputs, max_new_tokens=200, temperature=0.7, top_p=0.9,
                                          repetition_penalty=1.1)
+            
+        clean_output = self.tokenizer.decode(output[0], skip_special_tokens=True)
+        print("output",clean_output)
+        # Find the starting index for "Question:"
+        start_index = clean_output.find("Question:")
 
-        return self.tokenizer.decode(output[0], skip_special_tokens=True)
+        # Extract the substring starting from "Question:"
+        if start_index != -1:
+            extracted_string = clean_output[start_index:]
+            print("Extracted string:\n", extracted_string)
+        else:
+            extracted_string = clean_output 
+            print("The substring 'Question:' was not found in the text.")
+        
+        print("Extracted just before return ",extracted_string)
+        return extracted_string
 
     # def get_response(self, context, query):
     #     """

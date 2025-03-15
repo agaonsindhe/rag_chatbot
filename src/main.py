@@ -83,6 +83,7 @@ with col1:
                 st.write(response)
             else:
                 response = chatbot.get_response(merged_text, query)
+                print("response ", response)
                 response = guardrails.filter_output(response)  # Ensure output filtering
                 if response:
                     st.write("### Response:")

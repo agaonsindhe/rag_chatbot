@@ -8,7 +8,7 @@ class Guardrails:
     def validate_input(self, query):
         print(f"🔍 Validating Query: {query}")  # Log the raw query
 
-        financial_terms = ["interest income", "bank", "revenue", "income", "profit", "loss", "financial"]
+        financial_terms = ["interest income", "bank", "revenue", "income", "profit", "loss", "financial","Staff costs","Number of Employees"]
         is_valid = any(term.lower() in query.lower() for term in financial_terms)
 
         print(f"✅ Query Valid: {is_valid}")  # Log whether it passed validation
