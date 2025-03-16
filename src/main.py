@@ -55,12 +55,14 @@ rag_mode = st.sidebar.radio("Choose Retrieval Mode:", ["Basic RAG", "Advanced RA
 # Initialize Components
 processor = FinancialDataProcessor(config["data_path"])
 chunks = processor.preprocess_data()
+# print("chunks from loaded data ",chunks)
 embedding_model = EmbeddingModel(config["embedding_model"])
 embedding_cache_path = config["embedding_cache_path"]
 # Add dataset preview option
 if st.sidebar.button("Preview Dataset"):
     st.write("### Financial Dataset Preview")
     st.dataframe(processor.data.head(10))
+
 if os.path.exists(embedding_cache_path):
     print("✅ Loading cached embeddings...")
     with open(embedding_cache_path, "rb") as f:
@@ -72,6 +74,8 @@ else:
         pickle.dump(chunk_embeddings, f)
 
 vector_store = FAISSVectorStore(chunk_embeddings.shape[1])
+# Ensure embeddings are in float32 format (FAISS requirement)
+chunk_embeddings = chunk_embeddings.astype("float32")
 vector_store.add_embeddings(chunk_embeddings)
 vector_store.save_index(config["index_path"])
 vector_store.load_index(config["index_path"])
@@ -93,32 +97,41 @@ with col1:
     query = st.text_input("Enter your financial question:")
     if st.button("Get Answer"):
         start_time = time.time()  # Track response time
-        response = "⚠️ No relevant information found in the dataset."
-        if guardrails.validate_input(query):
+        response = "⚠No relevant information found in the dataset."
+        if guardrails.validate_input(query):  # Validate user input
             retrieved_chunks = chunk_merger.retrieve_chunks(query, top_k=config["retrieval"]["top_k"])
-            print(f"🔍 FAISS Retrieved Chunks (Count: {len(retrieved_chunks)}):", retrieved_chunks)
+            print(f"FAISS Retrieved Chunks (Before Processing): {retrieved_chunks}")
 
-            if rag_mode == "Basic RAG":
-                merged_text = "\n".join(retrieved_chunks)  # Simple merging
+            if isinstance(retrieved_chunks, str) or not retrieved_chunks:
+                print("FAISS did not return any relevant results. Using fallback.")
+                retrieved_chunks = []
+                retrieved_texts = []
+                confidence_scores = []
             else:
-                merged_text = chunk_merger.adaptive_merge_chunks(query, retrieved_chunks)  # Advanced merging
-            if not retrieved_chunks:
-                st.write(response)
-            else:
-                response = chatbot.get_response(merged_text, query)
-                print("response ", response)
-                response = guardrails.filter_output(response)  # Ensure output filtering
-                if response:
-                    st.write("### Response:")
-                    formatted_response = response.replace("\n", "  \n")  # Ensure newlines are preserved in Markdown
-                    st.markdown(f"```\n{formatted_response}\n```")  # Wrap in code block to preserve formatting
+                if isinstance(retrieved_chunks[0], tuple) and len(retrieved_chunks[0]) == 2:
+                    retrieved_texts = [chunk for chunk, confidence in retrieved_chunks]
+                    confidence_scores = [confidence for _, confidence in retrieved_chunks]
                 else:
-                    st.warning("⚠️ No response generated.")
+                    print("FAISS returned only text chunks without confidence scores. Fixing format...")
+                    retrieved_texts = retrieved_chunks
+                    confidence_scores = ["N/A"] * len(retrieved_chunks)
+
+            if not retrieved_texts:
+                response = "No relevant financial data found in the dataset."
+                confidence_scores = []
+            else:
+                response = chatbot.get_response("\n".join(retrieved_texts), query)
+                response = guardrails.filter_output(response)  # Ensure output filtering
+
+        else:
+            st.warning("Query blocked: This request does not match financial topics.")
+
         end_time = time.time()
         response_time = round(end_time - start_time, 2)
         st.sidebar.write(f"⏳ Response Time: {response_time} seconds")
-        # Store query, response, and RAG mode in session state chat history
-        st.session_state.chat_history.append((query, response, rag_mode))
+
+        # Store query, response, RAG mode, and confidence scores in chat history
+        st.session_state.chat_history.append((query, response, rag_mode, confidence_scores))
 
 st.divider()
 
@@ -130,6 +143,10 @@ with col2:
             max-height: 400px;
             overflow-y: auto;
             padding-right: 10px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 10px;
+            background-color: #f9f9f9;
         }
         </style>
         <div class="chat-history">
@@ -137,13 +154,29 @@ with col2:
 
     st.markdown("<h2 style='text-align: center;'>📜 Chat History</h2>", unsafe_allow_html=True)
 
-    for q, r, mode in reversed(st.session_state.chat_history):
-        rag_color = "#ff5733" if mode == "Basic RAG" else "#33b5e5"  # Different color for each mode
-        st.markdown(f"<p style='color:{rag_color}; font-weight: bold;'>{mode}</p>", unsafe_allow_html=True)
-        st.write(f"**Q:** {q}")
-        st.write(f"**A:** {r}")
-        st.write("---")
+    if not st.session_state.chat_history:
+        st.write("🔍 No chat history yet. Ask a question to start the conversation!")
 
-st.markdown("</div>", unsafe_allow_html=True)
+    else:
+        with st.container():  # Make chat history scrollable dynamically
+            for q, r, mode, confidence_scores in reversed(st.session_state.chat_history):
+                rag_color = "#ff5733" if mode == "Basic RAG" else "#33b5e5"  # Color for each mode
+                # Ensure confidence_scores are floats before rounding
+                confidence_display = ", ".join(
+                    [f"{round(float(score) * 100, 2)}%" for score in confidence_scores if
+                     isinstance(score, (int, float))]
+                ) or "N/A"
 
+                st.markdown(
+                    f"""
+                    <p style='color:{rag_color}; font-weight: bold;'>{mode}</p>
+                    <p><b>Q:</b> {q}</p>
+                    <p><b>A:</b> {r}</p>
+                    <p>🔍 <b>Confidence Scores:</b> {confidence_display}</p>
+                    <hr style="border:1px solid #ddd;">
+                    """,
+                    unsafe_allow_html=True
+                )
+
+    st.markdown("</div>", unsafe_allow_html=True)  # Close scrollable div
 

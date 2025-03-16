@@ -6,31 +6,60 @@ class FinancialDataProcessor:
     def __init__(self, file_path):
         self.file_path = file_path
         self.data = self.load_data()
-        self.column_names = []  # Store column names dynamically
+        print("init ",self.data.columns)
+        self.column_names = ["Company Name", "Sector", "Market Cap", "Stock P/E", "Year", "Revenue", "Net Profit"]
 
     def load_data(self):
-        return pd.read_csv(self.file_path)
+        """Load and clean the CSV file into a Pandas DataFrame."""
+        df = pd.read_csv(self.file_path)
+
+        # Standardize column names (trim spaces)
+        df.columns = df.columns.str.strip()
+        print("columns: ",df.columns)
+
+        # Handle missing values (replace with NaN and fill where needed)
+        df.replace(["-", "N/A", "NA", ""], pd.NA, inplace=True)
+
+        # Convert numerical columns to float after removing any text artifacts
+        for col in ["Market Cap", "Stock P/E", "Revenue", "Net Profit"]:
+            df[col] = df[col].astype(str).str.replace("Cr", "").str.strip()  # Remove 'Cr' notation
+            df[col] = pd.to_numeric(df[col], errors="coerce")  # Convert to numeric
+        print("after loop : ", df.columns)
+        # Sort by company and year
+        df.sort_values(by=["Company Name", "Year"], ascending=[True, True], inplace=True)
+        print("after sort : ", df.columns)
+        # Set index for efficient querying
+        # df.set_index(["Company Name", "Year"], inplace=True)
+        # print("before return : ", df.columns)
+        return df
 
     def preprocess_data(self, chunk_size=300, chunk_overlap=50):
-        """Load, preprocess, and chunk financial data dynamically."""
-        self.column_names = list(self.data.columns)  # Extract column names dynamically
+        """Format financial data as structured text and split into chunks."""
 
-        # Convert dataframe into structured text format (row-wise)
-        structured_data = "\n".join(self.data.astype(str).apply(lambda row: ", ".join(row), axis=1))
+        # Convert dataframe into structured text format for better context
+        structured_data = "\n".join(
+            self.data.reset_index().apply(
+                lambda row: f"Company: {row['Company Name']}, Year: {row['Year']}, "
+                            f"Sector: {row['Sector']}, Market Cap: {row['Market Cap']} Cr, "
+                            f"Stock P/E: {row['Stock P/E']}, Revenue: {row['Revenue']} Cr, "
+                            f"Net Profit: {row['Net Profit']} Cr",
+                axis=1
+            )
+        )
 
-        # Use a text splitter to chunk row-wise structured text
-        text_splitter = RecursiveCharacterTextSplitter(chunk_size=chunk_size, chunk_overlap=chunk_overlap, separators=["\n"])
+        # Use a text splitter to chunk structured financial text
+        text_splitter = RecursiveCharacterTextSplitter(chunk_size=chunk_size, chunk_overlap=chunk_overlap,
+                                                       separators=["\n"])
         return text_splitter.split_text(structured_data)
 
     def preview_data(self, num_rows=5):
-        """Display the first few rows of the dataset."""
-        print("\nPreview of Financial Dataset:")
-        print(self.data.head(num_rows))
+        """Display structured preview of the cleaned dataset."""
+        print("\n🔍 Preview of Processed Financial Data:")
+        print(self.data.reset_index().head(num_rows).to_string(index=False))
 
 
 if __name__ == "__main__":
-
-    # Initialize Components
-    processor = FinancialDataProcessor("data/BPF1_17032024142500687.csv")
+    # Initialize and process data
+    processor = FinancialDataProcessor("merged_financial_data_yearly.csv")  # Use new cleaned CSV
     chunks = processor.preprocess_data()
-    processor.preview_data(num_rows=len(chunks))
+    processor.preview_data(num_rows=5)
