@@ -6,6 +6,9 @@ from contextlib import redirect_stdout
 import re
 from transformers import pipeline
 
+from download_model import ensure_huggingface_model
+
+
 class RAGChatbot:
     def __init__(self, model_name=None):
         """
@@ -15,6 +18,7 @@ class RAGChatbot:
         with open("config.yaml", "r") as file:
             config = yaml.safe_load(file)
 
+        # Load models from config
         self.models = config["slm_models"]
 
         # If no model is provided, use the default one
@@ -54,7 +58,7 @@ class RAGChatbot:
         with torch.no_grad():
             output = self.model.generate(**inputs, max_new_tokens=200, temperature=0.7, top_p=0.9,
                                          repetition_penalty=1.1)
-            
+
         clean_output = self.tokenizer.decode(output[0], skip_special_tokens=True)
         print("output",clean_output)
         # Find the starting index for "Question:"
@@ -65,9 +69,9 @@ class RAGChatbot:
             extracted_string = clean_output[start_index:]
             print("Extracted string:\n", extracted_string)
         else:
-            extracted_string = clean_output 
+            extracted_string = clean_output
             print("The substring 'Question:' was not found in the text.")
-        
+
         print("Extracted just before return ",extracted_string)
         return extracted_string
 
