@@ -9,12 +9,12 @@ import streamlit as st
 import gradio as gr
 
 # Import custom modules
-from data_processor import FinancialDataProcessor
-from embedding_model import EmbeddingModel
-from vector_store import FAISSVectorStore
-from chunk_merger import ChunkMerger
-from rag_chatbot import RAGChatbot
-from guardrails import Guardrails
+from src.data_processor import FinancialDataProcessor
+from src.embedding_model import EmbeddingModel
+from src.vector_store import FAISSVectorStore
+from src.chunk_merger import ChunkMerger
+from src.rag_chatbot import RAGChatbot
+from src.guardrails import Guardrails
 
 # Parse command-line arguments for mode selection
 parser = argparse.ArgumentParser()

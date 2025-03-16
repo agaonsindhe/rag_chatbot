@@ -66,16 +66,36 @@ class ChunkMerger:
         """
         Advanced RAG: Merge retrieved chunks based on semantic similarity.
         """
-        chunk_embeddings = self.similarity_model.encode(retrieved_chunks)
-        query_embedding = self.similarity_model.encode([query])[0]
+
+        # **Handle empty retrieved chunks**
+        if not retrieved_chunks:
+            print("⚠️ No retrieved chunks available for merging.")
+            return "No relevant information found."
+
+        print(f"🧩 Retrieved Chunks for Merging: {retrieved_chunks}")
+
+        # **Ensure retrieved_chunks is a list of strings**
+        if isinstance(retrieved_chunks, str):
+            retrieved_chunks = [retrieved_chunks]
+
+        # **Ensure chunk_embeddings is always 2D**
+        chunk_embeddings = np.array(self.similarity_model.encode(retrieved_chunks))
+
+        if chunk_embeddings.ndim == 1:  # Convert 1D array to 2D
+            chunk_embeddings = chunk_embeddings.reshape(1, -1)
+
+        query_embedding = np.array(self.similarity_model.encode([query])[0])
+
+        # **Ensure query_embedding is 2D**
+        if query_embedding.ndim == 1:
+            query_embedding = query_embedding.reshape(1, -1)
 
         # Compute cosine similarity
-        similarities = np.dot(chunk_embeddings, query_embedding) / (
-            np.linalg.norm(chunk_embeddings, axis=1) * np.linalg.norm(query_embedding)
-        )
+        similarities = np.dot(chunk_embeddings, query_embedding.T).flatten()
 
         # Sort chunks by similarity
         sorted_chunks = [chunk for _, chunk in sorted(zip(similarities, retrieved_chunks), reverse=True)]
 
-        # Merge top 2 most similar chunks
-        return " ".join(sorted_chunks[:2])  # Use only top 2 most relevant chunks
+        # **Merge only top 2 chunks (if available)**
+        return " ".join(sorted_chunks[:2]) if len(sorted_chunks) > 1 else sorted_chunks[0]
+
