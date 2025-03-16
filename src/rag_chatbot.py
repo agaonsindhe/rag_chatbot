@@ -4,7 +4,6 @@ import yaml
 import io
 from contextlib import redirect_stdout
 import re
-from transformers import pipeline
 
 from download_model import ensure_huggingface_model
 
@@ -20,10 +19,27 @@ class RAGChatbot:
 
         # Load models from config
         self.models = config["slm_models"]
+        print("Available Models:", self.models)
 
+        # Fetch the actual Hugging Face model name
+        if model_name:
+            print("if model_name", model_name)
+            self.selected_model = model_name
+        else:
+            print("else default", config["slm_model"])
+            self.selected_model = config["slm_model"]
+
+        # Additional debug print
+        print(f"Selected Model: {self.selected_model}")
+
+        # Explicitly raise an error if the lookup failed
+        if not self.selected_model:
+            raise ValueError(f"Error: Failed to resolve the model name for key '{config["slm_model"]}'")
         # If no model is provided, use the default one
         self.selected_model = model_name if model_name else config["default_model"]
-        model_path = self.models[self.selected_model]
+        model_path = config["model_path"]+ self.selected_model
+
+        ensure_huggingface_model(self.selected_model, model_path)
 
         print(f"Loading model: {self.selected_model} ({model_path})...")
 
@@ -75,32 +91,3 @@ class RAGChatbot:
         print("Extracted just before return ",extracted_string)
         return extracted_string
 
-    # def get_response(self, context, query):
-    #     """
-    #     Generate a response using the dynamically selected model.
-    #     """
-    #     input_text = (
-    #         f"Use ONLY the following information to answer:\n{context}\n"
-    #         f"If the answer is not found, respond with 'I don't know'.\n"
-    #         f"Question: {query}\nAnswer:\n"
-    #     )
-    #
-    #     # Use Hugging Face pipeline for better response extraction
-    #     generator = pipeline("text-generation", model=self.model, tokenizer=self.tokenizer,
-    #                          device=0)  # Use GPU if available
-    #
-    #     print("🚀 Generating response...")
-    #     response_text = generator(input_text, max_new_tokens=200, do_sample=True, temperature=0.7, top_p=0.9)[0][
-    #         "generated_text"]
-    #
-    #     print(f"📝 Raw Model Response: {response_text}")  # Debug log
-    #
-    #     # Extract only the answer portion
-    #     if "Answer:" in response_text:
-    #         cleaned_response = response_text.split("Answer:")[-1].strip()
-    #     else:
-    #         cleaned_response = response_text  # Fallback
-    #
-    #     print(f"✅ Final Cleaned Response: {cleaned_response}")  # Debug log
-    #
-    #     return cleaned_response  # Return only the cleaned answer

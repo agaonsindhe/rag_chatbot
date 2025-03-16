@@ -6,7 +6,7 @@ embedding_model: "sentence-transformers/all-MiniLM-L6-v2"
 # Vector Database
 index_path: "models/vector_index.bin"
 embedding_cache_path: "models/embeddings.pkl"
-
+model_path: "models/"
 # RAG Settings
 retrieval:
   top_k: 5
