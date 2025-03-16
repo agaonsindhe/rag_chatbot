@@ -20,7 +20,7 @@ class FAISSVectorStore:
         """Load FAISS index from a file."""
         self.index = faiss.read_index(file_name)
 
-    def search(self, query_embedding, top_k=3):
+    def search(self, query_embedding, top_k=3   ):
         """Ensure FAISS search always returns (chunk, confidence) tuples."""
         distances, indices = self.index.search(query_embedding, top_k)
 

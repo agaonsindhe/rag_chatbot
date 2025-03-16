@@ -4,6 +4,8 @@ import os
 import pickle
 import time
 
+from pandas import DataFrame
+
 from data_processor import FinancialDataProcessor
 from embedding_model import EmbeddingModel
 from vector_store import FAISSVectorStore
@@ -55,7 +57,10 @@ rag_mode = st.sidebar.radio("Choose Retrieval Mode:", ["Basic RAG", "Advanced RA
 # Initialize Components
 processor = FinancialDataProcessor(config["data_path"])
 chunks = processor.preprocess_data()
-# print("chunks from loaded data ",chunks)
+processed_chunks = [chunk.strip() for chunk in chunks]
+for i, processed_chunk in enumerate(processed_chunks[:20]):  # Only first 20
+    print(f"🔹 Chunk {i + 1}: {repr(processed_chunk)}")  # Use `repr()` to see special characters clearly
+
 embedding_model = EmbeddingModel(config["embedding_model"])
 embedding_cache_path = config["embedding_cache_path"]
 # Add dataset preview option
@@ -69,7 +74,7 @@ if os.path.exists(embedding_cache_path):
         chunk_embeddings = pickle.load(f)
 else:
     print("Computing embeddings (first time only)...")
-    chunk_embeddings = embedding_model.encode(chunks)
+    chunk_embeddings = embedding_model.encode(processed_chunks)
     with open(embedding_cache_path, "wb") as f:
         pickle.dump(chunk_embeddings, f)
 
@@ -99,29 +104,36 @@ with col1:
         start_time = time.time()  # Track response time
         response = "⚠No relevant information found in the dataset."
         if guardrails.validate_input(query):  # Validate user input
-            retrieved_chunks = chunk_merger.retrieve_chunks(query, top_k=config["retrieval"]["top_k"])
-            print(f"FAISS Retrieved Chunks (Before Processing): {retrieved_chunks}")
+            df_filtered = chunk_merger.retrieve_chunks(query,
+                                                       top_k=config["retrieval"]["top_k"])  # Now returns a DataFrame
+            print(f"FAISS Retrieved Chunks (Before Processing):\n{df_filtered}")
 
-            if isinstance(retrieved_chunks, str) or not retrieved_chunks:
-                print("FAISS did not return any relevant results. Using fallback.")
-                retrieved_chunks = []
-                retrieved_texts = []
-                confidence_scores = []
-            else:
-                if isinstance(retrieved_chunks[0], tuple) and len(retrieved_chunks[0]) == 2:
-                    retrieved_texts = [chunk for chunk, confidence in retrieved_chunks]
-                    confidence_scores = [confidence for _, confidence in retrieved_chunks]
-                else:
-                    print("FAISS returned only text chunks without confidence scores. Fixing format...")
-                    retrieved_texts = retrieved_chunks
-                    confidence_scores = ["N/A"] * len(retrieved_chunks)
-
-            if not retrieved_texts:
+            # **Check if DataFrame is empty (no relevant results found)**
+            if df_filtered.empty:
+                print("⚠️ FAISS did not return any relevant results. Using fallback.")
                 response = "No relevant financial data found in the dataset."
-                confidence_scores = []
             else:
-                response = chatbot.get_response("\n".join(retrieved_texts), query)
+                print(f"✅ FAISS Retrieved {len(df_filtered)} Chunks with Confidence Scores.")
+
+                # **Extract text for chatbot processing**
+                retrieved_texts = df_filtered.drop(columns=["Confidence Score"],
+                                                   errors="ignore")  # Remove confidence column
+                retrieved_texts = retrieved_texts.apply(lambda row: ", ".join(row.astype(str)),
+                                                        axis=1).tolist()  # Convert to list of formatted strings
+
+                # **Extract confidence scores separately**
+                confidence_scores = df_filtered["Confidence Score"].tolist() if "Confidence Score" in df_filtered else [
+                                                                                                                           "N/A"] * len(
+                    df_filtered)
+
+                # **Prepare structured input for the chatbot**
+                structured_text = "\n".join(retrieved_texts)  # Merge rows for chatbot input
+
+                # **Get chatbot response**
+                response = chatbot.get_response(structured_text, query)
                 response = guardrails.filter_output(response)  # Ensure output filtering
+
+            print(f"📤 Final Response: {response}")
 
         else:
             st.warning("Query blocked: This request does not match financial topics.")

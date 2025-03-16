@@ -50,7 +50,7 @@ class RAGChatbot:
             f"- If a specific year is mentioned, return data ONLY for that year.\n"
             f"- If a numerical threshold is mentioned, apply it to the relevant column.\n"
             f"- If the requested data is unavailable, respond with 'I don't know'.\n\n"
-            f"Question: {query}\nAnswer:"
+            f"Question: {query}\n\nAnswer:"
         )
 
         print("input prompt: ",input_text)
@@ -62,10 +62,13 @@ class RAGChatbot:
         clean_output = self.tokenizer.decode(output[0], skip_special_tokens=True)
         print("response: ",clean_output)
         # **Enhancement: Clean up unnecessary preamble in the response**
-        answer_start = clean_output.find("✍ **Answer:**")
+        answer_start = clean_output.find("Answer:")
+        print("answer start: ",answer_start)
         if answer_start != -1:
-            extracted_answer = clean_output[answer_start + len("✍ **Answer:**") :].strip()
+            print("inside if: ",answer_start)
+            extracted_answer = clean_output[answer_start + len("Answer:") :].strip()
         else:
+            print("inside else: ", clean_output.strip())
             extracted_answer = clean_output.strip()
 
         print("✅ Extracted Answer:\n", extracted_answer)

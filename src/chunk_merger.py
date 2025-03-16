@@ -31,7 +31,7 @@ class ChunkMerger:
 
         # Convert retrieved chunks into structured DataFrame format
         column_names = list(self.df.columns)  # Dynamically extract column names
-        column_names.append("Confidence Score")
+        # column_names.append("Confidence")
         data_rows = []
         confidence_scores = []
         print("column names ",column_names)
@@ -48,29 +48,26 @@ class ChunkMerger:
         df_filtered["Confidence Score"] = confidence_scores  # Add confidence scores to DataFrame
 
         # **Extract numerical constraints from the query**
-        # year_match = re.search(r"\b(19|20)\d{2}\b", query)  # Extract year
-        # income_match = re.search(r"\b\d+\b", query)  # Extract numeric threshold
-        #
-        # # **Apply year filtering**
-        # if "Year" in column_names and year_match:
-        #     target_year = year_match.group(0)
-        #     df_filtered = df_filtered[df_filtered["Year"] == target_year]
-        #     print(f"📅 Year Filter Applied: {target_year}")
-        #
-        # # **Apply financial threshold filtering**
-        # if income_match:
-        #     income_threshold = float(income_match.group(0))
-        #     if "Revenue" in column_names:
-        #         df_filtered = df_filtered[df_filtered["Revenue"].astype(float) > income_threshold]
-        #     elif "Net Profit" in column_names:
-        #         df_filtered = df_filtered[df_filtered["Net Profit"].astype(float) > income_threshold]
-        #     print(f"💰 Income Filter Applied: > {income_threshold}")
+        year_match = re.search(r"\b(19|20)\d{2}\b", query)  # Extract year
+        income_match = re.search(r"\b\d+\b", query)  # Extract numeric threshold
 
-        print(f"Final Filtered Chunks:\n{df_filtered}")
-        # Return structured text instead of raw chunks
-        result = df_filtered.to_string(index=False) if not df_filtered.empty else "No relevant information found."
-        print(f"Final Retrieval Output:\n{result}")
-        return result
+        # **Apply year filtering**
+        if "Year" in column_names and year_match:
+            target_year = year_match.group(0)
+            df_filtered = df_filtered[df_filtered["Year"] == target_year]
+            print(f"📅 Year Filter Applied: {target_year}")
+
+        # **Apply financial threshold filtering**
+        if income_match:
+            income_threshold = float(income_match.group(0))
+            if "Revenue" in column_names:
+                df_filtered = df_filtered[df_filtered["Revenue"].astype(float) > income_threshold]
+            elif "Net Profit" in column_names:
+                df_filtered = df_filtered[df_filtered["Net Profit"].astype(float) > income_threshold]
+            print(f"💰 Income Filter Applied: > {income_threshold}")
+
+
+        return df_filtered
 
     def merge_chunks(self, query, top_k=3):
         """Retrieve & merge top-k relevant financial chunks."""
