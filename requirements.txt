@@ -8,4 +8,4 @@ gpt4all
 langchain
 langchain-community
 transformers
-
+accelerate>=0.26.0
