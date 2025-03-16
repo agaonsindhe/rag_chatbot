@@ -4,7 +4,8 @@
 embedding_model: "sentence-transformers/all-MiniLM-L6-v2"
 
 # Vector Database
-index_path: "models/vector_index.pkl"
+index_path: "models/vector_index.bin"
+embedding_cache_path: "models/embeddings.pkl"
 model_path: "models/"
 # RAG Settings
 retrieval:
@@ -29,7 +30,7 @@ ui:
 
 data_path: "data/BPF1_17032024142500687.csv"
 #slm_model: "TinyLlama/TinyLlama-1.1B-Chat-v1.0"
-slm_model: "TinyLlama/TinyLlama-1.1B-Chat-v1.0"
+slm_model: "google/gemma-2b"
 
 slm_models:
 #  mistral: "mistralai/Mistral-7B-Instruct-v0.1"

@@ -23,10 +23,10 @@ class RAGChatbot:
 
         # Fetch the actual Hugging Face model name
         if model_name:
-            print("if model_name",model_name)
+            print("if model_name", model_name)
             self.selected_model = model_name
         else:
-            print("else default",config["slm_model"])
+            print("else default", config["slm_model"])
             self.selected_model = config["slm_model"]
 
         # Additional debug print
@@ -35,22 +35,20 @@ class RAGChatbot:
         # Explicitly raise an error if the lookup failed
         if not self.selected_model:
             raise ValueError(f"Error: Failed to resolve the model name for key '{config["slm_model"]}'")
-
-        model_path = config["model_path"]
-        print(self.selected_model,model_path)
+        # If no model is provided, use the default one
+        self.selected_model = model_name if model_name else config["default_model"]
+        model_path = config["model_path"]+ self.selected_model
 
         ensure_huggingface_model(self.selected_model, model_path)
 
         print(f"Loading model: {self.selected_model} ({model_path})...")
 
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
-        model_name = model_path + self.selected_model
-        print("loding model from ",model_name)
-        self.tokenizer = AutoTokenizer.from_pretrained(model_name)
+        self.tokenizer = AutoTokenizer.from_pretrained(model_path)
 
         # Load model with optimized settings
         self.model = AutoModelForCausalLM.from_pretrained(
-            model_name,
+            model_path,
             torch_dtype=torch.float16 if self.device == "cuda" else torch.float32,
             low_cpu_mem_usage=True  # Optimized memory usage
         ).to(self.device)
@@ -59,38 +57,37 @@ class RAGChatbot:
 
     def get_response(self, context, query):
         """
-        Generate a response using the dynamically selected model.
+        Generate a response using structured financial data.
         """
         input_text = (
-            f"Use ONLY the following information to answer:\n{context}\n"
-            f"If the answer is not found, respond with 'I don't know'.\n"
-            f"Question: {query}\nAnswer:\n"
+            f"Use ONLY the structured financial data below to answer the question.\n\n"
+            f"DATASET:\n{context}\n\n"
+            f"Follow these rules:\n"
+            f"- If a specific year is mentioned, return data ONLY for that year.\n"
+            f"- If a numerical threshold is mentioned, apply it to the relevant column.\n"
+            f"- If the requested data is unavailable, respond with 'I don't know'.\n\n"
+            f"Question: {query}\nAnswer:"
         )
 
         inputs = self.tokenizer(input_text, return_tensors="pt", truncation=True, max_length=512).to(self.device)
 
         with torch.no_grad():
-            output_ids = self.model.generate(
-                **inputs,
-                max_new_tokens=200,
-                temperature=0.7,
-                top_p=0.9,
-                repetition_penalty=1.1,
-                return_dict_in_generate=True,  # Ensure structured return
-                output_scores=True  # Track generated tokens
-            )
+            output = self.model.generate(**inputs, max_new_tokens=200, temperature=0.7, top_p=0.9,
+                                         repetition_penalty=1.1)
 
-        # Decode the model's output to text
-        response_text = self.tokenizer.decode(output_ids["sequences"][0], skip_special_tokens=True)
+        clean_output = self.tokenizer.decode(output[0], skip_special_tokens=True)
+        print("output",clean_output)
+        # Find the starting index for "Question:"
+        start_index = clean_output.find("Question:")
 
-        print(f"📝 Raw Model Response: {response_text}")  # Debug log
-
-        # Extract only the answer portion
-        if "Answer:" in response_text:
-            cleaned_response = response_text.split("Answer:")[-1].strip()
+        # Extract the substring starting from "Question:"
+        if start_index != -1:
+            extracted_string = clean_output[start_index:]
+            print("Extracted string:\n", extracted_string)
         else:
-            cleaned_response = response_text  # Fallback
+            extracted_string = clean_output
+            print("The substring 'Question:' was not found in the text.")
 
-        print(f"✅ Final Cleaned Response: {cleaned_response}")  # Debug log
+        print("Extracted just before return ",extracted_string)
+        return extracted_string
 
-        return cleaned_response  # Return only the cleaned answer
